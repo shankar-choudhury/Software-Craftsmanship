@@ -2,6 +2,8 @@ package edu.cwru.sxc1782;
 
 import org.junit.jupiter.api.Test;
 
+import java.math.BigInteger;
+import java.util.List;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -102,7 +104,40 @@ class MatrixMapTest {
         assertThrows(NullPointerException.class, () -> MatrixMap.from(null));
     }
 
-    // How to test for InvalidLengthException?
+    @Test
+    void plus() {
+        MatrixMap<BigInteger> m1 = MatrixMap.constant(1, new BigInteger("111111111111111"));
+        MatrixMap<BigInteger> m2 = MatrixMap.constant(1, new BigInteger("333333333333333"));
+        assertEquals("444444444444444 444444444444444 444444444444444 444444444444444 ", m1.plus(m2, (indexes, otherIndexes) -> new BigIntegerRing().sum(indexes, otherIndexes)).toString());
+
+        List<BigInteger> l1 = List.of(new BigInteger("111111111111111"), new BigInteger("111111111111111"), new BigInteger("111111111111111"));
+        List<BigInteger> l2 = List.of(new BigInteger("333333333333333"), new BigInteger("333333333333333"), new BigInteger("333333333333333"));
+        Polynomial<BigInteger> p1 = Polynomial.from(l1);
+        Polynomial<BigInteger> p2 = Polynomial.from(l2);
+        MatrixMap<Polynomial<BigInteger>> m3 = MatrixMap.constant(1, p1);
+        MatrixMap<Polynomial<BigInteger>> m4 = MatrixMap.constant(1, p2);
+        Ring<Polynomial<BigInteger>> r = PolynomialRing.from(new BigIntegerRing());
+        assertEquals("[444444444444444, 444444444444444, 444444444444444] [444444444444444, 444444444444444, 444444444444444] [444444444444444, 444444444444444, 444444444444444] [444444444444444, 444444444444444, 444444444444444] ", m3.plus(m4, r::sum).toString());
+    }
+
+    @Test
+    void times() {
+        MatrixMap<BigInteger> m1 = MatrixMap.constant(1, new BigInteger("111111111111111"));
+        MatrixMap<BigInteger> m2 = MatrixMap.constant(1, new BigInteger("333333333333333"));
+        assertEquals("74074074074073925925925925926 74074074074073925925925925926 74074074074073925925925925926 74074074074073925925925925926 ",
+                m1.times(m2, new BigIntegerRing()).toString());
+
+        List<BigInteger> l1 = List.of(new BigInteger("111111111111111"), new BigInteger("111111111111111"), new BigInteger("111111111111111"));
+        List<BigInteger> l2 = List.of(new BigInteger("333333333333333"), new BigInteger("333333333333333"), new BigInteger("333333333333333"));
+        Polynomial<BigInteger> p1 = Polynomial.from(l1);
+        Polynomial<BigInteger> p2 = Polynomial.from(l2);
+        MatrixMap<Polynomial<BigInteger>> m3 = MatrixMap.constant(1, p1);
+        MatrixMap<Polynomial<BigInteger>> m4 = MatrixMap.constant(1, p2);
+        Ring<Polynomial<BigInteger>> r = PolynomialRing.from(new BigIntegerRing());
+        assertEquals("[74074074074073925925925925926, 148148148148147851851851851852, 222222222222221777777777777778, 148148148148147851851851851852, 74074074074073925925925925926] [74074074074073925925925925926, 148148148148147851851851851852, 222222222222221777777777777778, 148148148148147851851851851852, 74074074074073925925925925926] [74074074074073925925925925926, 148148148148147851851851851852, 222222222222221777777777777778, 148148148148147851851851851852, 74074074074073925925925925926] [74074074074073925925925925926, 148148148148147851851851851852, 222222222222221777777777777778, 148148148148147851851851851852, 74074074074073925925925925926] ",
+                m3.times(m4, r).toString());
+    }
+
     @Test
     void testExceptionThrown() {
         try {
@@ -114,6 +149,37 @@ class MatrixMapTest {
             fail("Wrong exception thrown");
         }
 
+        try {
+            MatrixMap<BigInteger> m1 = MatrixMap.constant(1, new BigInteger("111111111111111"));
+            MatrixMap<BigInteger> m2 = MatrixMap.constant(2, new BigInteger("333333333333333"));
+            MatrixMap<BigInteger> m3 = m1.plus(m2, new BigIntegerRing()::sum);
+        }
+        catch (IllegalArgumentException i) {
+            assertTrue(i.getCause() instanceof MatrixMap.InconsistentSizeException);
+        } catch (Exception e) {
+            fail("Wrong exception thrown");
+        }
 
+        try {
+            MatrixMap<BigInteger> m1 = MatrixMap.constant(1, new BigInteger("111111111111111"));
+            MatrixMap<BigInteger> m2 = MatrixMap.constant(2, new BigInteger("333333333333333"));
+            MatrixMap<BigInteger> m3 = m1.times(m2, new BigIntegerRing());
+        }
+        catch (IllegalArgumentException i) {
+            assertTrue(i.getCause() instanceof MatrixMap.InconsistentSizeException);
+        } catch (Exception e) {
+            fail("Wrong exception thrown");
+        }
+
+        try {
+            MatrixMap<BigInteger> m1 = MatrixMap.instance(2, 3, indexes -> new BigInteger("111111111111111"));
+            MatrixMap<BigInteger> m2 = MatrixMap.constant(2, new BigInteger("333333333333333"));;
+            MatrixMap<BigInteger> m3 = m1.times(m2, new BigIntegerRing());
+        }
+        catch (IllegalStateException i) {
+            assertTrue(i.getCause() instanceof MatrixMap.NonSquareException);
+        } catch (Exception e) {
+            fail("Wrong exception thrown");
+        }
     }
 }
