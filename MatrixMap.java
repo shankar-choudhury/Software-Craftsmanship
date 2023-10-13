@@ -5,16 +5,16 @@ import java.util.*;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public final class MatrixMap<T> {
     private final Map<Indexes, T> matrix;
-
     private final Indexes size;
 
-    private MatrixMap(Map<Indexes, T> matrix) {
+    private MatrixMap(Map<Indexes, T> matrix, Indexes size) {
         this.matrix = matrix;
-        size = Collections.max(getMatrix().keySet());
+        this.size = size;
     }
 
     /**
@@ -74,10 +74,11 @@ public final class MatrixMap<T> {
      * @return A new matrix with a specific number of Indexes from given rows and columns
      */
     public static <S> MatrixMap<S> instance(int rows, int columns, Function<Indexes, S> valueMapper) {
-        return new MatrixMap<>( newMatrix(Indexes.stream(
+
+        return new MatrixMap<>( Map.copyOf(newMatrix(Indexes.stream(
                 InvalidLengthException.requireNonEmpty(InvalidLengthException.Cause.ROW, rows),
                 InvalidLengthException.requireNonEmpty(InvalidLengthException.Cause.COLUMN, columns))
-                , Objects.requireNonNull(valueMapper)));
+                , Objects.requireNonNull(valueMapper))), new Indexes(rows, columns));
     }
 
     /**
@@ -88,9 +89,7 @@ public final class MatrixMap<T> {
      * @return A new matrix with a specific number of Indexes from given Indexes size
      */
     public static <S> MatrixMap<S> instance(Indexes size, Function<Indexes, S> valueMapper) {
-        InvalidLengthException.requireNonEmpty(InvalidLengthException.Cause.ROW, size.row());
-        InvalidLengthException.requireNonEmpty(InvalidLengthException.Cause.COLUMN, size.column());
-        return new MatrixMap<>(newMatrix(Indexes.stream(size), Objects.requireNonNull(valueMapper)));
+        return MatrixMap.instance(size.row(), size.column(), valueMapper);
     }
 
     /**
@@ -100,9 +99,7 @@ public final class MatrixMap<T> {
      * @return A new matrix of given size, filled with given value
      */
     public static <S> MatrixMap<S> constant(int size, S value) {
-        return new MatrixMap<>(newSquareMatrix(
-                InvalidLengthException.requireNonEmpty(InvalidLengthException.Cause.ROW, size),
-                Objects.requireNonNull(value)));
+        return MatrixMap.instance(size, size, indexes -> value);
     }
 
     /**
@@ -115,7 +112,6 @@ public final class MatrixMap<T> {
      * holding the zero value
      */
     public static <S> MatrixMap<S> identity(int size, S zero, S identity) {
-        InvalidLengthException.requireNonEmpty(InvalidLengthException.Cause.ROW, size);
         Objects.requireNonNull(zero);
         Objects.requireNonNull(identity);
         return MatrixMap.instance(size, size, indexes -> indexes.areDiagonal() ? identity : zero);
@@ -128,7 +124,7 @@ public final class MatrixMap<T> {
      */
     public static <S> MatrixMap<S> from(S[][] matrix) {
         Objects.requireNonNull(matrix);
-        return new MatrixMap<>( newMatrix(Indexes.stream(matrix[0].length - 1, matrix.length - 1), indexes -> indexes.value(matrix)));
+        return MatrixMap.instance(matrix[0].length - 1, matrix.length - 1, indexes -> indexes.value(matrix));
     }
 
     /**
@@ -138,14 +134,28 @@ public final class MatrixMap<T> {
      * @return A new MatrixMap representing the sum of this MatrixMap with another MatrixMap
      */
     public MatrixMap<T> plus(MatrixMap<T> other, BinaryOperator<T> plus) {
-        return MatrixMap.instance(size(), indexes -> plus.apply(value(indexes), other.value(indexes)));
+        Objects.requireNonNull(plus);
+        Indexes size = InconsistentSizeException.requireMatchingSize(this, Objects.requireNonNull(other));
+        return MatrixMap.instance(size.row(), size.column(), indexes -> plus.apply(value(indexes), other.value(indexes)));
     }
 
+    /**
+     * Return a new MatrixMap representing the product of this MatrixMap with another MatrixMap
+     * @param other Other MatrixMap used in this multiplication
+     * @param ring Ring to define multiplication method to use for each indexes in either MatrixMap
+     * @return A new MatrixMap representing the product of this MatrixMap with another MatrixMap
+     */
     public MatrixMap<T> times(MatrixMap<T> other, Ring<T> ring) {
-        Map<Indexes, T> map = new HashMap<>();
-        return new MatrixMap<>(map);
-    }
+        Indexes otherSize = NonSquareException.requireDiagonal(
+                InconsistentSizeException.requireMatchingSize(this, Objects.requireNonNull(other)));
+        Objects.requireNonNull(ring);
 
+        return MatrixMap.instance(otherSize.row(), otherSize.column(),
+                indexes -> IntStream
+                .range(0, otherSize.row() + 1)
+                .mapToObj(n -> ring.product(value(indexes.row(), n), other.value(n, indexes.column())))
+                .reduce(ring.zero(), ring::sum));
+    }
 
     /**
      * Instantiate a new Map from a stream of Indexes as keys and values generated by valueMapper method
@@ -156,8 +166,8 @@ public final class MatrixMap<T> {
     private static <S> Map<Indexes, S> newMatrix(Stream<Indexes> indexesStream, Function<Indexes, S> valueMapper) {
         assert indexesStream != null;
         assert valueMapper != null;
-        return Map.copyOf(indexesStream
-                .collect(Collectors.toMap(Function.identity(), valueMapper)));
+        return indexesStream
+                .collect(Collectors.toMap(Function.identity(), valueMapper));
     }
 
     /**
@@ -198,6 +208,48 @@ public final class MatrixMap<T> {
             if (length < 1)
                 throw new IllegalArgumentException(new InvalidLengthException(cause, length));
             return length;
+        }
+    }
+
+    public static class InconsistentSizeException extends Exception {
+        private final Indexes thisIndex;
+        private final Indexes otherIndex;
+
+        public InconsistentSizeException(Indexes thisIndex, Indexes otherIndex) {
+            this.thisIndex = thisIndex;
+            this.otherIndex = otherIndex;
+        }
+
+        public Indexes getThisIndex() {
+            return thisIndex;
+        }
+        public Indexes getOtherIndex() {
+            return otherIndex;
+        }
+
+        // Should I return a copy of this Matrix's size indexes?
+        public static <T> Indexes requireMatchingSize(MatrixMap<T> thisMatrix, MatrixMap<T> otherMatrix) {
+            if (!thisMatrix.size().equals(otherMatrix.size()))
+                throw new IllegalArgumentException(new InconsistentSizeException(thisMatrix.size(), otherMatrix.size()));
+            return otherMatrix.size();
+        }
+    }
+
+    public static class NonSquareException extends Exception {
+        private final Indexes indexes;
+
+        public NonSquareException(Indexes indexes) {
+            this.indexes = indexes;
+        }
+
+        public Indexes getIndexes() {
+            return indexes;
+        }
+
+        public static Indexes requireDiagonal(Indexes indexes) {
+            if (!indexes.areDiagonal())
+                throw new IllegalStateException(new NonSquareException(indexes));
+            return indexes;
         }
     }
 }
