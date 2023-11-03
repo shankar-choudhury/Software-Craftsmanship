@@ -44,7 +44,7 @@ public class LandscapeTest {
         Landscape l = new Landscape();
         Landscape.TestHook testHook = l.new TestHook();
 
-        l.modify(6, 0, Landscape.Operation.RAISE);
+        assertThrows(AssertionError.class, () -> l.modify(6, 0, Landscape.Operation.RAISE));
         assertEquals(Map.of(), testHook.get());
         assertEquals("x1 cannot be greater than x2; returning early", handler.getLastLog().orElse("Failed test"));
 
@@ -64,7 +64,7 @@ public class LandscapeTest {
         Landscape l = new Landscape();
         Landscape.TestHook t = l.new TestHook();
 
-        l.modify(6, 0, Landscape.Operation.DEPRESS);
+        assertThrows(AssertionError.class, () -> l.modify(6, 0, Landscape.Operation.DEPRESS));
         assertEquals(Map.of(), t.get());
         assertEquals("x1 cannot be greater than x2; returning early", handler.getLastLog().orElse("Nothing in here"));
 
@@ -83,7 +83,7 @@ public class LandscapeTest {
         Landscape l = new Landscape();
         Landscape.TestHook t = l.new TestHook();
 
-        l.modify(1, -2, Landscape.Operation.RAISE);
+        assertThrows(AssertionError.class, () -> l.modify(1, -2, Landscape.Operation.RAISE));
         assertEquals(Map.of(), t.get());
         assertEquals("x1 cannot be greater than x2; returning early", handler.getLastLog().orElse("Failed test"));
 
@@ -103,7 +103,7 @@ public class LandscapeTest {
         Landscape l = new Landscape();
         Landscape.TestHook t = l.new TestHook();
 
-        l.modify(2, -2, Landscape.Operation.RAISE);
+        assertThrows(AssertionError.class, () -> l.modify(2, -2, Landscape.Operation.HILL));
         assertEquals(Map.of(), t.get());
         assertEquals("x1 cannot be greater than x2; returning early", handler.getLastLog().orElse("Failed test"));
 
@@ -140,7 +140,7 @@ public class LandscapeTest {
         Landscape l = new Landscape();
         Landscape.TestHook t = l.new TestHook();
 
-        l.modify(2, -2, Landscape.Operation.RAISE);
+        assertThrows(AssertionError.class, () -> l.modify(2, -2, Landscape.Operation.VALLEY));
         assertEquals(Map.of(), t.get());
         assertEquals("x1 cannot be greater than x2; returning early", handler.getLastLog().orElse("Failed test"));
 
@@ -163,6 +163,23 @@ public class LandscapeTest {
     }
 
     @Test
+    public void testRaiseOrDepress() {
+        Landscape l = new Landscape();
+        Landscape.TestHook t = l.new TestHook();
+
+        assertThrows(AssertionError.class, () -> t.raiseOrDepress(7, 2, Landscape.Operation.DEPRESS));
+        assertThrows(AssertionError.class, () -> t.raiseOrDepress(2, 7, null));
+        assertThrows(AssertionError.class, () -> t.raiseOrDepress(2, 7, Landscape.Operation.HILL));
+        assertThrows(AssertionError.class, () -> t.raiseOrDepress(2, 7, Landscape.Operation.VALLEY));
+        assertThrows(AssertionError.class, () -> t.raiseOrDepress(2, 7, Landscape.Operation.FOO));
+
+        t.raiseOrDepress(2, 5, Landscape.Operation.RAISE);
+        assertEquals(Map.of(2, 1, 3, 1, 4, 1, 5, 1), t.get());
+        t.raiseOrDepress(2, 5, Landscape.Operation.DEPRESS);
+        assertEquals(Map.of(2, 0, 3, 0, 4, 0, 5, 0), t.get());
+    }
+
+    @Test
     public void testCreateValleyOrHill() {
         Landscape l = new Landscape();
         Landscape.TestHook t = l.new TestHook();
@@ -181,9 +198,10 @@ public class LandscapeTest {
         Landscape.TestHook t = l.new TestHook();
 
         assertThrows(AssertionError.class, () -> t.initAmount(null));
-        assertThrows(AssertionError.class, () -> t.initAmount(Landscape.Operation.RAISE));
-        assertThrows(AssertionError.class, () -> t.initAmount(Landscape.Operation.DEPRESS));
+        assertThrows(AssertionError.class, () -> t.initAmount(Landscape.Operation.FOO));
 
+        assertEquals(1, t.initAmount(Landscape.Operation.RAISE));
+        assertEquals(-1, t.initAmount(Landscape.Operation.DEPRESS));
         assertEquals(1, t.initAmount(Landscape.Operation.HILL));
         assertEquals(-1, t.initAmount(Landscape.Operation.VALLEY));
     }
