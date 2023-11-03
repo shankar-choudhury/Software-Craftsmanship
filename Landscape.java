@@ -26,12 +26,8 @@ public class Landscape {
         Objects.requireNonNull(operation);
 
         switch (operation) { // Refactored with enhanced switch statement
-            case RAISE -> IntStream.range(x1, x2 + 1).forEach(num -> {
-                landscape.put(num, landscape.getOrDefault(num, 0) + 1);
-            });
-            case DEPRESS -> IntStream.range(x1, x2 + 1).forEach(num -> {
-                landscape.put(num, landscape.getOrDefault(num, 0) - 1);
-            });
+            case RAISE -> raiseOrDepress(x1, x2,Operation.RAISE);
+            case DEPRESS -> raiseOrDepress(x1, x2, Operation.DEPRESS);
             case HILL -> createHillOrValley(x1, x2, Operation.HILL);
             case VALLEY -> createHillOrValley(x1, x2, Operation.VALLEY);
             default -> logger.log(Level.WARNING, "Unknown operation, skipping");
@@ -50,6 +46,16 @@ public class Landscape {
             }
         }
         System.out.println(l.get());
+    }
+
+    private void raiseOrDepress(int x1, int x2, Operation o) {
+        assert x1 <= x2;
+        assert o != null;
+        assert o != Operation.HILL;
+        assert o != Operation.VALLEY;
+        int value = initAmt(o);
+        IntStream.range(x1, x2 + 1).forEach(num ->
+            landscape.put(num, landscape.getOrDefault(num, 0) + value));
     }
 
     private void createHillOrValley(int x1, int x2, Operation o) { // Added general method to remove duplicate code for createHill and createValley
@@ -71,8 +77,8 @@ public class Landscape {
     private int initAmt(Operation o) {
         assert o != null;
         return switch (o) {
-            case HILL -> 1;
-            case VALLEY -> -1;
+            case RAISE, HILL -> 1;
+            case DEPRESS, VALLEY -> -1;
             default -> throw new AssertionError("Cannot use this operation");
         };
     }
@@ -127,8 +133,8 @@ public class Landscape {
             return Landscape.this.get();
         }
 
-        void createHill(int x1, int x2) {
-            Landscape.this.createHillOrValley(x1, x2, Operation.HILL);
+        void raiseOrDepress(int x1, int x2, Operation o) {
+            Landscape.this.raiseOrDepress(x1, x2, o);
         }
 
         void createValley(int x1, int x2) { Landscape.this.createHillOrValley(x1, x2, Operation.VALLEY); }
